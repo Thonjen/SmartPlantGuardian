@@ -21,6 +21,8 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="config" options={{ title: 'Configure Arduino' }} />
+        <Stack.Screen name="plant-monitor" options={{ title: 'Plant Monitor' }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
