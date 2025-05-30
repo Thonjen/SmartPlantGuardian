@@ -1,72 +1,70 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Stack } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Button, StyleSheet, Text, View } from 'react-native';
+import { Stack } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import { Button, StyleSheet, Text, View } from "react-native";
 
 const PlantMonitor = () => {
   const [sensorData, setSensorData] = useState({
-    soilMoisture: '',
-    temperature: 0,
-    humidity: 0,
-    lastWatered: '',
+    soilMoisture: "",
+    lastWatered: "",
   });
 
-  const [ipAddress, setIpAddress] = useState('');
+  const [wsIpAddress] = useState("192.168.254.197"); // Replace with your IP
+  const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    // Load the saved IP address when the component mounts
-    const loadIpAddress = async () => {
+    if (!wsIpAddress) return;
+
+    ws.current = new WebSocket(`ws://${wsIpAddress}:8080`);
+
+    ws.current.onopen = () => {
+      console.log("Connected to WebSocket server");
+      ws.current?.send(JSON.stringify({ command: "getStatus" }));
+    };
+
+    const intervalId = setInterval(() => {
+      ws.current?.send(JSON.stringify({ command: "getStatus" }));
+    }, 10000);
+
+    ws.current.onmessage = (event) => {
       try {
-        const savedIp = await AsyncStorage.getItem('arduinoIp');
-        if (savedIp) {
-          setIpAddress(savedIp);
+        const message = JSON.parse(event.data);
+        if (message.type === "sensorData" || message.soilMoisture) {
+          setSensorData({
+            soilMoisture: message.soilMoisture || message.data?.soilMoisture,
+            lastWatered: new Date(
+              message.lastWateredMillis || message.data?.lastWateredMillis
+            ).toLocaleTimeString(),
+          });
         }
-      } catch (error) {
-        console.error('Error loading IP address:', error);
+      } catch (e) {
+        console.error("Invalid message:", event.data);
       }
     };
 
-    loadIpAddress();
-  }, []);
+    ws.current.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
 
-  useEffect(() => {
-    // Fetch sensor data when the IP address is loaded
-    if (ipAddress) {
-      fetchSensorData();
-    }
-  }, [ipAddress]);
+    ws.current.onclose = () => {
+      console.log("WebSocket closed");
+    };
 
-  const fetchSensorData = async () => {
-    try {
-      const response = await fetch(`http://${ipAddress}/status`);
-      const data = await response.json();
-      setSensorData(data);
-    } catch (error) {
-      console.error('Error fetching sensor data:', error);
-    }
-  };
+    return () => {
+      clearInterval(intervalId);
+      ws.current?.close();
+    };
+  }, [wsIpAddress]);
 
-  const waterPlant = async () => {
-    try {
-      const response = await fetch(`http://${ipAddress}/water`, {
-        method: 'POST',
-      });
-      const data = await response.json();
-      console.log(data);
-      // Optionally, you can update the lastWatered time here
-    } catch (error) {
-      console.error('Error watering plant:', error);
-    }
+  const waterPlant = () => {
+    ws.current?.send(JSON.stringify({ command: "waterNow" }));
   };
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Plant Monitor' }} />
+      <Stack.Screen options={{ title: "Plant Monitor" }} />
       <View style={styles.container}>
         <Text style={styles.title}>Plant Monitor</Text>
         <Text>Soil Moisture: {sensorData.soilMoisture}</Text>
-        <Text>Temperature: {sensorData.temperature}°C</Text>
-        <Text>Humidity: {sensorData.humidity}%</Text>
         <Text>Last Watered: {sensorData.lastWatered}</Text>
         <Button title="Water Now" onPress={waterPlant} />
       </View>
@@ -77,8 +75,8 @@ const PlantMonitor = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   title: {
@@ -87,4 +85,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PlantMonitor; 
+export default PlantMonitor;
