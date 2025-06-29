@@ -3,10 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import tw from 'twrnc';
 
-const SERVER_URL = 'http://192.168.254.190:3000'; // Change this to your computer's IP
+const SERVER_URL = 'http://192.168.254.197:3000'; // Change this to your computer's IP
 
 const SensorBox = ({ icon, label, value, status, unit, color, loading }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -27,13 +35,13 @@ const SensorBox = ({ icon, label, value, status, unit, color, loading }) => {
   }, [value]);
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         tw`w-[48%] border-2 rounded-2xl p-5 items-center bg-white shadow-lg mb-4`,
-        { 
-          borderColor: color, 
+        {
+          borderColor: color,
           backgroundColor: color + '20',
-          transform: [{ scale: scaleAnim }]
+          transform: [{ scale: scaleAnim }],
         }
       ]}
     >
@@ -58,19 +66,52 @@ export default function App() {
   const [watering, setWatering] = useState(false);
   const [error, setError] = useState(null);
   const [lastWatered, setLastWatered] = useState('N/A');
-  const [selectedPlant, setSelectedPlant] = useState(null);
   const [plants, setPlants] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Live “Last updated” clock
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Animated value for the plant emoji
+  const plantAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    const interval = setInterval(fetchStatus, 10000);
+    // Fetch status every 30s
+    const interval = setInterval(fetchStatus, 30000);
     fetchStatus();
+
     // Request notification permissions
     Notifications.requestPermissionsAsync();
+
     loadPlants();
     fetchLastWatered();
-    return () => clearInterval(interval);
+
+    // Start the plant bounce animation (looping)
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(plantAnim, {
+          toValue: -10,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(plantAnim, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Update currentTime every second
+    const clockInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(clockInterval);
+    };
   }, []);
 
   const onRefresh = async () => {
@@ -166,7 +207,7 @@ export default function App() {
 
   return (
     <LinearGradient colors={['#e0f7fa', '#a5d6a7']} style={tw`flex-1`}>
-      <ScrollView 
+      <ScrollView
         style={tw`flex-1`}
         contentContainerStyle={tw`p-5 pt-12`}
         refreshControl={
@@ -174,11 +215,27 @@ export default function App() {
         }
       >
         <View style={tw`items-center mb-8`}>
-          <Text style={tw`text-3xl font-bold text-green-700 mb-2`}>
+          {/* Title */}
+          <Text style={tw`text-3xl font-bold text-green-700 mb-1`}>
             🌿 Plant Monitor
           </Text>
-          <Text style={tw`text-gray-600`}>
-            Last updated: {new Date().toLocaleTimeString()}
+
+          {/* Animated (larger) plant emoji */}
+          <Animated.Text
+            style={[
+              tw`text-9xl`,              // ← increased from text-4xl to text-6xl
+              {
+                transform: [{ translateY: plantAnim }],
+              }
+            ]}
+          >
+
+            🌱
+          </Animated.Text>
+
+          {/* Live “Last updated” clock */}
+          <Text style={tw`text-gray-600 mt-2`}>
+            Current Time: {currentTime.toLocaleTimeString()}
           </Text>
         </View>
 
@@ -196,7 +253,13 @@ export default function App() {
             icon={temp.icon}
             label="Temperature"
             value={status.temperature}
-            status={status.temperature < 18 ? 'Too Cold' : status.temperature > 30 ? 'Too Hot' : 'Normal'}
+            status={
+              status.temperature < 18
+                ? 'Too Cold'
+                : status.temperature > 30
+                ? 'Too Hot'
+                : 'Normal'
+            }
             unit="°C"
             color={temp.color}
             loading={loading}
@@ -205,7 +268,13 @@ export default function App() {
             icon={humidity.icon}
             label="Humidity"
             value={status.humidity}
-            status={status.humidity < 40 ? 'Dry' : status.humidity > 80 ? 'Wet' : 'Normal'}
+            status={
+              status.humidity < 40
+                ? 'Dry'
+                : status.humidity > 80
+                ? 'Wet'
+                : 'Normal'
+            }
             unit="%"
             color={humidity.color}
             loading={loading}
@@ -224,9 +293,9 @@ export default function App() {
         <TouchableOpacity
           style={[
             tw`flex-row items-center justify-center py-4 px-6 rounded-full shadow-lg mt-6 mb-4`,
-            { 
+            {
               backgroundColor: watering ? '#B2DFDB' : '#4CAF50',
-              transform: [{ scale: watering ? 0.95 : 1 }]
+              transform: [{ scale: watering ? 0.95 : 1 }],
             }
           ]}
           onPress={waterNow}

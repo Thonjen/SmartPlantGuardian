@@ -3,7 +3,7 @@ import { ActivityIndicator, Switch, Text, TextInput, TouchableOpacity, View } fr
 import tw from 'twrnc';
 
 // Replace with your computer's local IP address
-const SERVER_URL = 'http://192.168.254.190:3000'; // Change this to your computer's IP
+const SERVER_URL = 'http://192.168.254.197:3000'; // Change this to your computer's IP
 
 export default function Settings() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
